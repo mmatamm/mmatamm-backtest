@@ -1,6 +1,5 @@
 mod timestep_series;
 
-use ahash::{HashMap, HashMapExt};
 use chrono::DateTime;
 use dashmap::DashMap;
 use timestep_series::TimestepSeries;
@@ -25,17 +24,9 @@ pub struct Ohlc {
 pub struct QueryEngine<F: Fetcher> {
     fetcher: RwLock<F>,
 
-    // TODO PERF Use ahash::RandomState
-    // prices_series: DashMap<String, TimestepSeries<Ohlc>, ahash::RandomState>,
-    prices_series: DashMap<String, TimestepSeries<Ohlc>>,
+    prices_series: DashMap<String, TimestepSeries<Ohlc>, ahash::RandomState>,
     system_events_series: RwLock<TimestepSeries<SystemEvent>>,
 }
-
-// impl std::fmt::Display for QueryEngine {
-//     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         todo!()
-//     }
-// }
 
 impl<F: Fetcher> QueryEngine<F> {
     pub async fn new(fetcher: RwLock<F>) -> Result<Self, F::Error> {
@@ -44,7 +35,7 @@ impl<F: Fetcher> QueryEngine<F> {
 
         Ok(Self {
             fetcher,
-            prices_series: DashMap::new(),
+            prices_series: DashMap::with_hasher(ahash::RandomState::new()),
             system_events_series: RwLock::new(system_events_series),
         })
     }
