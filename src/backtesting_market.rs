@@ -9,13 +9,12 @@ use chrono::{DateTime, Utc};
 use fetcher::Fetcher;
 pub use query_engine::QueryEngine;
 use thiserror::Error;
-use tokio::sync::RwLock;
 
 use mmatamm_interface::market::{Event, ImpossibleEvent, Market, MarketTime, SystemEvent};
 
 pub struct BacktestingMarket<'a, F: Fetcher> {
     // /// A database client TODO better comment needed
-    query_engine: &'a RwLock<QueryEngine<F>>,
+    query_engine: &'a QueryEngine<F>,
 
     /// The current virtual time
     time: DateTime<Utc>,
@@ -38,7 +37,7 @@ pub struct BacktestingMarket<'a, F: Fetcher> {
 
 impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
     pub async fn new(
-        query_engine: &'a RwLock<QueryEngine<F>>,
+        query_engine: &'a QueryEngine<F>,
         start: DateTime<Utc>,
         cash: f32,
     ) -> Result<Self, Error<F>> {
@@ -68,8 +67,7 @@ impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
         }
 
         // Else, fetch the next event
-        let mut fetcher = self.query_engine.write().await; // PERF This takes 12% of the total runtime!
-        let event = fetcher.query_system_event(&self.time).await;
+        let event = self.query_engine.query_system_event(&self.time).await;
 
         // Cache it
         self.next_system_event =
@@ -169,13 +167,7 @@ impl<F: Fetcher + Send + Sync + std::fmt::Debug + 'static> Market for Backtestin
         }
 
         // Return the last close price
-        let query_price = match self
-            .query_engine
-            .write()
-            .await
-            .query_price(&time, &symbol)
-            .await
-        {
+        let query_price = match self.query_engine.query_price(&time, &symbol).await {
             Ok(it) => it,
             Err(err) => return Err(FetcherError(err).into()),
         };

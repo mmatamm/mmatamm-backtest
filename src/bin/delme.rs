@@ -151,8 +151,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    let fetcher = QuestDbFetcher::new(client).await?;
-    let query_engine = RwLock::new(QueryEngine::new(fetcher).await?);
+    let fetcher = RwLock::new(QuestDbFetcher::new(client).await?);
+    let query_engine = QueryEngine::new(fetcher).await?;
 
     let mut market = StatsGatheringMarket::new(
         BacktestingMarket::new(

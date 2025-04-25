@@ -2,9 +2,11 @@ mod timestep_series;
 
 use ahash::{HashMap, HashMapExt};
 use chrono::DateTime;
+use dashmap::DashMap;
 use timestep_series::TimestepSeries;
 
 use mmatamm_interface::market::SystemEvent;
+use tokio::sync::RwLock;
 
 use super::Fetcher;
 
@@ -21,11 +23,12 @@ pub struct Ohlc {
 
 #[derive(Debug)]
 pub struct QueryEngine<F: Fetcher> {
-    fetcher: F,
+    fetcher: RwLock<F>,
 
-    // TODO PERF Use DashMap and make this thing Sync/Send
-    prices_series: HashMap<String, TimestepSeries<Ohlc>>,
-    system_events_series: TimestepSeries<SystemEvent>,
+    // TODO PERF Use ahash::RandomState
+    // prices_series: DashMap<String, TimestepSeries<Ohlc>, ahash::RandomState>,
+    prices_series: DashMap<String, TimestepSeries<Ohlc>>,
+    system_events_series: RwLock<TimestepSeries<SystemEvent>>,
 }
 
 // impl std::fmt::Display for QueryEngine {
@@ -35,23 +38,30 @@ pub struct QueryEngine<F: Fetcher> {
 // }
 
 impl<F: Fetcher> QueryEngine<F> {
-    pub async fn new(fetcher: F) -> Result<Self, F::Error> {
-        let system_events_series = TimestepSeries::new(fetcher.fetch_system_events().await?);
+    pub async fn new(fetcher: RwLock<F>) -> Result<Self, F::Error> {
+        let system_events_series =
+            TimestepSeries::new(fetcher.read().await.fetch_system_events().await?);
 
         Ok(Self {
             fetcher,
-            prices_series: HashMap::new(),
-            system_events_series,
+            prices_series: DashMap::new(),
+            system_events_series: RwLock::new(system_events_series),
         })
     }
 
     pub async fn query_price(
-        &mut self,
+        &self,
         time: &chrono::DateTime<chrono::Utc>,
         symbol: &str,
     ) -> Result<Option<f32>, F::Error> {
         if !self.prices_series.contains_key(symbol) {
-            let s = TimestepSeries::new(self.fetcher.fetch_ticker_prices(symbol).await?);
+            let s = TimestepSeries::new(
+                self.fetcher
+                    .read()
+                    .await
+                    .fetch_ticker_prices(symbol)
+                    .await?,
+            );
             self.prices_series.insert(symbol.to_owned(), s);
         }
 
@@ -63,11 +73,12 @@ impl<F: Fetcher> QueryEngine<F> {
     }
 
     pub async fn query_system_event(
-        &mut self,
+        &self,
         time: &chrono::DateTime<chrono::Utc>,
     ) -> Option<(SystemEvent, chrono::NaiveDateTime)> {
         // TODO use NaiveDateTime
-        let event_opt = self.system_events_series.query_after(&time.naive_utc());
+        let system_events_series = self.system_events_series.read().await;
+        let event_opt = system_events_series.query_after(&time.naive_utc());
         event_opt.map(|(timestamp, event)| {
             (
                 event.clone(),
