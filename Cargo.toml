@@ -1,0 +1,13 @@
+[package]
+name = "mmatamm-backtest"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = "0.4.38"
+flexi_logger = "0.29.0"
+float_eq = "1.0.1"
+mmatamm-interface = { git = "https://github.com/mmatamm/mmatamm-interface.git", version = "0.1.0" }
+tabled = "0.16.0"
+tokio = { version = "1.40.0", features = ["full"] }
+tokio-postgres = { version = "0.7.12", features = ["with-chrono-0_4"] }
