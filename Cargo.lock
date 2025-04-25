@@ -149,9 +149,9 @@ checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
 name = "cc"
-version = "1.2.19"
+version = "1.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e3a13707ac958681c13b39b458c073d0d9bc8a22cb1b2f4c8e55eb72c13f362"
+checksum = "04da6a0d40b948dfc4fa8f5bbf402b0fc1a64a28dbf7d12ffd683550f2c1b63a"
 dependencies = [
  "shlex",
 ]
@@ -258,19 +258,6 @@ name = "flexi_logger"
 version = "0.29.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88a5a6882b2e137c4f2664562995865084eb5a00611fba30c582ef10354c4ad8"
-dependencies = [
- "chrono",
- "log",
- "nu-ansi-term",
- "regex",
- "thiserror",
-]
-
-[[package]]
-name = "flexi_logger"
-version = "0.30.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcd71620581c99445892ad71e2c2e0d6f62edf2e22822556f0d2ee9f8508af29"
 dependencies = [
  "chrono",
  "log",
@@ -657,11 +644,16 @@ dependencies = [
 name = "mmatamm-backtest"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "chrono",
- "flexi_logger 0.29.8",
+ "dashmap",
+ "flexi_logger",
  "float_eq",
+ "hdf5-metno",
  "mmatamm-interface",
+ "ndarray",
  "tabled",
+ "thiserror",
  "tokio",
  "tokio-postgres",
 ]
@@ -669,20 +661,14 @@ dependencies = [
 [[package]]
 name = "mmatamm-interface"
 version = "0.1.0"
-source = "git+https://github.com/mmatamm/mmatamm-interface.git#1eb2f3310dbca315d86bd6e85501762635fb43aa"
+source = "git+https://github.com/mmatamm/mmatamm-interface.git#26d550df1631ae697f385234253cf61a1d672d78"
 dependencies = [
- "ahash",
  "chrono",
- "dashmap",
- "flexi_logger 0.30.1",
  "float_eq",
  "futures",
- "hdf5-metno",
- "ndarray",
  "rand",
  "thiserror",
  "tokio",
- "tokio-postgres",
 ]
 
 [[package]]

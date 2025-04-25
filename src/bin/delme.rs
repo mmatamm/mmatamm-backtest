@@ -1,9 +1,11 @@
 use std::{collections::VecDeque, error::Error};
 
 use chrono::{DateTime, DurationRound, TimeDelta, Utc};
-use mmatamm_backtest::stats_gathering_market::StatsGatheringMarket;
-use mmatamm_interface::{
+use mmatamm_backtest::{
     backtesting_market::{fetcher::QuestDbFetcher, BacktestingMarket, QueryEngine},
+    stats_gathering_market::StatsGatheringMarket,
+};
+use mmatamm_interface::{
     market::{Event, Market, MarketTime, SystemEvent},
     Algorithm,
 };
