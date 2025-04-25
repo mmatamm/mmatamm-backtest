@@ -18,11 +18,10 @@ pub struct StatsGatheringMarket<M: Market + Send> {
 
     first_trade: Option<DateTime<Utc>>,
     initial_net_worth: Option<f32>,
+    initial_benchmark: Option<f32>,
 
     // This is useful for calculating the Sharpe ratio
     excess_returns_aggregator: StdDevAggregator,
-    previous_net_worth: Option<f32>,
-    previous_benchmark: Option<f32>,
 }
 
 impl<M: Market + Send> StatsGatheringMarket<M> {
@@ -39,10 +38,9 @@ impl<M: Market + Send> StatsGatheringMarket<M> {
 
             first_trade: None,
             initial_net_worth: None,
+            initial_benchmark: None,
 
             excess_returns_aggregator: StdDevAggregator::default(),
-            previous_net_worth: None,
-            previous_benchmark: None,
         }
     }
 
@@ -101,27 +99,19 @@ impl<M: Market + Send> StatsGatheringMarket<M> {
     }
 
     async fn take_sample(&mut self) {
-        if self.market_time() == MarketTime::Regular {
-            println!(
-                "Sample @ {}, net worth: {}",
-                self.time(),
-                self.net_worth().await.unwrap()
-            );
-        }
-
         let net_worth = self.net_worth().await.unwrap() as f32;
         let benchmark = self.current_price(&self.benchmark).await.unwrap() as f32;
 
-        if let Some(previous_net_worth) = self.previous_net_worth {
+        if let Some(previous_net_worth) = self.initial_net_worth {
             let previous_benchmark = self
-                .previous_benchmark
+                .initial_benchmark
                 .expect("previous_net_worth is set but previous_benchmark is not");
 
             let excess = net_worth / previous_net_worth - benchmark / previous_benchmark;
             self.excess_returns_aggregator.update(excess);
         } else {
-            self.previous_net_worth = Some(net_worth);
-            self.previous_benchmark = Some(benchmark);
+            self.initial_net_worth = Some(net_worth);
+            self.initial_benchmark = Some(benchmark);
         }
     }
 }
@@ -204,7 +194,6 @@ impl<M: Market + Send> Market for StatsGatheringMarket<M> {
     async fn buy_at_market(&mut self, symbol: &str, quantity: u32) -> Result<(), Self::Error> {
         if self.first_trade.is_none() {
             self.first_trade = Some(self.market.time());
-            self.initial_net_worth = Some(self.market.net_worth().await?);
         }
 
         self.market.buy_at_market(symbol, quantity).await
