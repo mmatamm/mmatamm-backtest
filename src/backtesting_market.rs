@@ -165,8 +165,7 @@ impl<F: Fetcher + std::fmt::Debug + Send + 'static> Market for BacktestingMarket
         }
 
         // Return the last close price
-        let local_symbol = symbol.to_string(); // TODO this is ugly
-        let query_price = match self.query_engine.query_price(&time, &local_symbol) {
+        let query_price = match self.query_engine.query_price(&time, symbol) {
             Ok(it) => it,
             Err(err) => return Err(FetcherError(err).into()),
         };
