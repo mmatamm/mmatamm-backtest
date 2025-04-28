@@ -3,7 +3,7 @@ mod timestep_series;
 use std::sync::{Arc, Mutex};
 
 use chrono::DateTime;
-use dashmap::DashMap;
+use papaya;
 use timestep_series::TimestepSeries;
 
 use mmatamm_interface::market::SystemEvent;
@@ -25,7 +25,7 @@ pub struct Ohlc {
 pub struct QueryEngine<F: Fetcher> {
     fetcher: Arc<Mutex<F>>,
 
-    prices_series: DashMap<String, TimestepSeries<Ohlc>, ahash::RandomState>,
+    prices_series: papaya::HashMap<String, TimestepSeries<Ohlc>, ahash::RandomState>,
     system_events_series: Mutex<TimestepSeries<SystemEvent>>,
 }
 
@@ -36,7 +36,7 @@ impl<F: Fetcher> QueryEngine<F> {
 
         Ok(Self {
             fetcher: fetcher_mutex,
-            prices_series: DashMap::with_hasher(ahash::RandomState::new()),
+            prices_series: papaya::HashMap::with_hasher(ahash::RandomState::new()),
             system_events_series: Mutex::new(system_events_series),
         })
     }
@@ -46,17 +46,34 @@ impl<F: Fetcher> QueryEngine<F> {
         time: &chrono::DateTime<chrono::Utc>,
         symbol: &str,
     ) -> Result<Option<f32>, F::Error> {
-        if !self.prices_series.contains_key(symbol) {
+        if !self.prices_series.pin().contains_key(symbol) {
             let s = TimestepSeries::new(self.fetcher.lock().unwrap().fetch_ticker_prices(symbol)?);
-            self.prices_series.insert(symbol.to_string(), s);
+            self.prices_series.pin().insert(symbol.to_string(), s);
         }
 
-        let series = self.prices_series.get(symbol).unwrap();
+        let prices_series = self.prices_series.pin();
+        let series = prices_series.get(symbol).unwrap();
 
         Ok(series
             .query_before(&time.naive_utc())
             .map(|(_time, ohlc)| ohlc.close))
     }
+    // pub fn query_price(
+    //     &self,
+    //     time: &chrono::DateTime<chrono::Utc>,
+    //     symbol: &str,
+    // ) -> Result<Option<f32>, F::Error> {
+    //     if !self.prices_series.contains_key(symbol) {
+    //         let s = TimestepSeries::new(self.fetcher.lock().unwrap().fetch_ticker_prices(symbol)?);
+    //         self.prices_series.insert(symbol.to_string(), s);
+    //     }
+
+    //     let series = self.prices_series.get(symbol).unwrap();
+
+    //     Ok(series
+    //         .query_before(&time.naive_utc())
+    //         .map(|(_time, ohlc)| ohlc.close))
+    // }
 
     pub fn query_system_event(
         &self,
