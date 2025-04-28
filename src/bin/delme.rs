@@ -9,8 +9,7 @@ use mmatamm_interface::{
     market::{Event, Market, MarketTime, SystemEvent},
     Algorithm,
 };
-use tokio::sync::RwLock;
-use tokio_postgres::NoTls;
+use postgres::NoTls;
 
 struct CrossMovingAverageStrategy {
     symbol: String,
@@ -54,10 +53,10 @@ impl Algorithm for CrossMovingAverageStrategy {
         vec![].into_iter()
     }
 
-    async fn run<M: Market>(&mut self, market: &mut M) -> Result<(), M::Error> {
+    fn run<M: Market>(&mut self, market: &mut M) -> Result<(), M::Error> {
         // Wait for the market to initialy open
         loop {
-            let ev = market.next_event().await?.expect("No events").1;
+            let ev = market.next_event()?.expect("No events").1;
             if ev == Event::SystemEvent(SystemEvent::RegularMarketStart) {
                 break;
             }
@@ -71,7 +70,7 @@ impl Algorithm for CrossMovingAverageStrategy {
             + self.timestep_duration;
 
         for _ in 0..3000 {
-            let (_, event) = market.next_event_until(next_tick).await?;
+            let (_, event) = market.next_event_until(next_tick)?;
             if event != Event::Deadline {
                 continue;
             }
@@ -82,7 +81,7 @@ impl Algorithm for CrossMovingAverageStrategy {
                 continue;
             }
 
-            let current_price = market.current_price(&self.symbol).await?;
+            let current_price = market.current_price(&self.symbol)?;
             self.long_ma_samples.push_front(current_price);
             self.short_ma_samples.push_front(current_price);
 
@@ -104,7 +103,7 @@ impl Algorithm for CrossMovingAverageStrategy {
                         // buy
                         // TODO add a market extender function for this
                         let quantity = market.cash() / current_price;
-                        market.buy_at_market(&self.symbol, quantity as u32).await?;
+                        market.buy_at_market(&self.symbol, quantity as u32)?;
                         println!("({}) buying {} shares", market.time(), quantity as u32);
 
                         self.last_bought = true;
@@ -114,7 +113,7 @@ impl Algorithm for CrossMovingAverageStrategy {
                     // sell
                     // TODO add a market extender function for this
                     let quantity = market.shares_of(&self.symbol);
-                    market.sell_at_market(&self.symbol, quantity).await?;
+                    market.sell_at_market(&self.symbol, quantity)?;
                     println!("({}) selling {} shares", market.time(), quantity);
 
                     self.last_bought = false;
@@ -123,51 +122,40 @@ impl Algorithm for CrossMovingAverageStrategy {
             }
         }
 
-        println!("net worth: {}", market.net_worth().await?);
+        println!("net worth: {}", market.net_worth()?);
 
         Ok(())
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     flexi_logger::Logger::try_with_env()
         .unwrap()
         .start()
         .unwrap();
 
     // Connect to the database
-    let (client, connection) = tokio_postgres::connect(
+    let db_client = postgres::Client::connect(
         "user=admin password=quest host=localhost port=8812 dbname=qdb",
         NoTls,
-    )
-    .await?;
+    )?;
 
-    // The connection object performs the actual communication with the database,
-    // so spawn it off to run on its own.
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
-
-    let fetcher = RwLock::new(QuestDbFetcher::new(client).await?);
-    let query_engine = QueryEngine::new(fetcher).await?;
+    let fetcher = QuestDbFetcher::new(db_client)?;
+    let query_engine = QueryEngine::new(fetcher)?;
 
     let mut market = StatsGatheringMarket::new(
         BacktestingMarket::new(
             &query_engine,
             "2024-06-25T13:00:00Z".parse::<DateTime<Utc>>()?,
             10_000.0,
-        )
-        .await?,
+        )?,
         TimeDelta::minutes(15),
         "SPY".to_string(),
     );
     let mut myalgo = CrossMovingAverageStrategy::new("PLTR", TimeDelta::minutes(5), 5, 10);
-    myalgo.run(&mut market).await?;
+    myalgo.run(&mut market)?;
 
-    println!("{}", market.display().await?);
+    println!("{}", market.display()?);
 
     Ok(())
 }

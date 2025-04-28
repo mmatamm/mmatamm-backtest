@@ -52,10 +52,9 @@ impl<M: Market + Send> StatsGatheringMarket<M> {
         Some(self.market.time() - self.first_trade?)
     }
 
-    pub async fn net_return(&self) -> Result<Option<f32>, M::Error> {
+    pub fn net_return(&self) -> Result<Option<f32>, M::Error> {
         self.market
             .net_worth()
-            .await
             .map(|current| Some(current / self.initial_net_worth? - 1.0))
     }
 
@@ -72,7 +71,7 @@ impl<M: Market + Send> StatsGatheringMarket<M> {
         }
     }
 
-    pub async fn display(&self) -> Result<String, M::Error> {
+    pub fn display(&self) -> Result<String, M::Error> {
         let mut builder = Builder::default();
 
         builder.push_record(["Current Time", &format!("{}", self.market.time())]);
@@ -84,7 +83,7 @@ impl<M: Market + Send> StatsGatheringMarket<M> {
             builder.push_record(["Duration (Days)", &duration.num_days().to_string()]);
         }
 
-        if let Some(net_return) = self.net_return().await? {
+        if let Some(net_return) = self.net_return()? {
             builder.push_record(["Net Return", &format!("{0:.2}%", net_return * 100.0)]);
         }
 
@@ -98,9 +97,9 @@ impl<M: Market + Send> StatsGatheringMarket<M> {
         Ok(table.to_string())
     }
 
-    async fn take_sample(&mut self) {
-        let net_worth = self.net_worth().await.unwrap() as f32;
-        let benchmark = self.current_price(&self.benchmark).await.unwrap() as f32;
+    fn take_sample(&mut self) {
+        let net_worth = self.net_worth().unwrap() as f32;
+        let benchmark = self.current_price(&self.benchmark).unwrap() as f32;
 
         if let Some(previous_net_worth) = self.initial_net_worth {
             let previous_benchmark = self
@@ -119,14 +118,14 @@ impl<M: Market + Send> StatsGatheringMarket<M> {
 impl<M: Market + Send> Market for StatsGatheringMarket<M> {
     type Error = M::Error;
 
-    async fn next_event(&mut self) -> Result<Option<(DateTime<Utc>, Event)>, Self::Error> {
+    fn next_event(&mut self) -> Result<Option<(DateTime<Utc>, Event)>, Self::Error> {
         loop {
-            let (time, event) = self.market.next_event_until(self.next_sample).await?;
+            let (time, event) = self.market.next_event_until(self.next_sample)?;
 
             match event {
                 Event::Deadline => {
                     self.next_sample += self.sample_rate;
-                    self.take_sample().await;
+                    self.take_sample();
                     // Continue the loop to fetch the next event
                 }
                 e => return Ok(Some((time, e))),
@@ -164,18 +163,18 @@ impl<M: Market + Send> Market for StatsGatheringMarket<M> {
     //         }
     //     }
     // }
-    async fn next_event_until(
+    fn next_event_until(
         &mut self,
         deadline: chrono::DateTime<Utc>,
     ) -> Result<(DateTime<Utc>, Event), Self::Error> {
         loop {
             let until = self.next_sample.min(deadline);
-            let (time, event) = self.market.next_event_until(until).await?;
+            let (time, event) = self.market.next_event_until(until)?;
 
             match event {
                 Event::Deadline if self.next_sample <= deadline => {
                     self.next_sample += self.sample_rate;
-                    self.take_sample().await;
+                    self.take_sample();
                     // Continue the loop to fetch the next event
                 }
                 _ => return Ok((time, event)),
@@ -187,20 +186,20 @@ impl<M: Market + Send> Market for StatsGatheringMarket<M> {
         self.market.time()
     }
 
-    async fn price_at(&self, symbol: &str, time: DateTime<Utc>) -> Result<f32, Self::Error> {
-        self.market.price_at(symbol, time).await
+    fn price_at(&self, symbol: &str, time: DateTime<Utc>) -> Result<f32, Self::Error> {
+        self.market.price_at(symbol, time)
     }
 
-    async fn buy_at_market(&mut self, symbol: &str, quantity: u32) -> Result<(), Self::Error> {
+    fn buy_at_market(&mut self, symbol: &str, quantity: u32) -> Result<(), Self::Error> {
         if self.first_trade.is_none() {
             self.first_trade = Some(self.market.time());
         }
 
-        self.market.buy_at_market(symbol, quantity).await
+        self.market.buy_at_market(symbol, quantity)
     }
 
-    async fn sell_at_market(&mut self, symbol: &str, quantity: u32) -> Result<(), Self::Error> {
-        self.market.sell_at_market(symbol, quantity).await
+    fn sell_at_market(&mut self, symbol: &str, quantity: u32) -> Result<(), Self::Error> {
+        self.market.sell_at_market(symbol, quantity)
     }
 
     fn market_time(&self) -> MarketTime {

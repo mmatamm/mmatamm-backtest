@@ -34,7 +34,7 @@ impl HDF5Fetcher {
 impl Fetcher for HDF5Fetcher {
     type Error = Error;
 
-    async fn fetch_system_events(&self) -> Result<Vec<(i64, SystemEvent)>, Self::Error> {
+    fn fetch_system_events(&mut self) -> Result<Vec<(i64, SystemEvent)>, Self::Error> {
         let system_events_array = self
             .file
             .dataset("system_events")?
@@ -54,7 +54,7 @@ impl Fetcher for HDF5Fetcher {
         Ok(system_events.to_vec())
     }
 
-    async fn fetch_ticker_prices(&self, symbol: &str) -> Result<Vec<(i64, Ohlc)>, Self::Error> {
+    fn fetch_ticker_prices(&mut self, symbol: &str) -> Result<Vec<(i64, Ohlc)>, Self::Error> {
         let dataset = self.prices_group.dataset(symbol)?;
         let array: Array2<i32> = dataset.read()?;
         let p = array.map_axis(Axis(1), |row| {

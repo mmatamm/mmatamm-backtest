@@ -36,7 +36,7 @@ pub struct BacktestingMarket<'a, F: Fetcher> {
 }
 
 impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
-    pub async fn new(
+    pub fn new(
         query_engine: &'a QueryEngine<F>,
         start: DateTime<Utc>,
         cash: f32,
@@ -55,9 +55,7 @@ impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
         })
     }
 
-    async fn peek_next_system_event(
-        &mut self,
-    ) -> Result<Option<(DateTime<Utc>, SystemEvent)>, Error<F>> {
+    fn peek_next_system_event(&mut self) -> Result<Option<(DateTime<Utc>, SystemEvent)>, Error<F>> {
         // println!("I'm here!");
         // If the next event is cached and it still is the next event, return it
         if let Some((next_system_event_time, _)) = self.next_system_event {
@@ -67,7 +65,7 @@ impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
         }
 
         // Else, fetch the next event
-        let event = self.query_engine.query_system_event(&self.time).await;
+        let event = self.query_engine.query_system_event(&self.time);
 
         // Cache it
         self.next_system_event =
@@ -77,8 +75,8 @@ impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
         Ok(self.next_system_event.clone())
     }
 
-    async fn peek_next_event(&mut self) -> Result<Option<(DateTime<Utc>, Event)>, Error<F>> {
-        let next_system_event = self.peek_next_system_event().await?;
+    fn peek_next_event(&mut self) -> Result<Option<(DateTime<Utc>, Event)>, Error<F>> {
+        let next_system_event = self.peek_next_system_event()?;
         let next_internal_event = self.events.front();
 
         match (next_system_event, next_internal_event) {
@@ -98,11 +96,11 @@ impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
     }
 }
 
-impl<F: Fetcher + Send + Sync + std::fmt::Debug + 'static> Market for BacktestingMarket<'_, F> {
+impl<F: Fetcher + std::fmt::Debug + Send + 'static> Market for BacktestingMarket<'_, F> {
     type Error = Error<F>;
 
-    async fn next_event(&mut self) -> Result<Option<(DateTime<Utc>, Event)>, Self::Error> {
-        match self.peek_next_event().await? {
+    fn next_event(&mut self) -> Result<Option<(DateTime<Utc>, Event)>, Self::Error> {
+        match self.peek_next_event()? {
             Some((time, event)) => {
                 self.time = time;
 
@@ -118,7 +116,7 @@ impl<F: Fetcher + Send + Sync + std::fmt::Debug + 'static> Market for Backtestin
         }
     }
 
-    async fn next_event_until(
+    fn next_event_until(
         &mut self,
         deadline: DateTime<Utc>,
     ) -> Result<(DateTime<Utc>, Event), Self::Error> {
@@ -126,7 +124,7 @@ impl<F: Fetcher + Send + Sync + std::fmt::Debug + 'static> Market for Backtestin
         // function let next_tick = self.time.duration_trunc(tick).unwrap() +
         // tick;
 
-        let event = if let Some((time, event)) = self.peek_next_event().await? {
+        let event = if let Some((time, event)) = self.peek_next_event()? {
             if time <= deadline {
                 if let Event::SystemEvent(ref system_event) = event {
                     self.market_time.update(&system_event)?;
@@ -150,7 +148,7 @@ impl<F: Fetcher + Send + Sync + std::fmt::Debug + 'static> Market for Backtestin
         self.time
     }
 
-    async fn price_at(&self, symbol: &str, time: DateTime<Utc>) -> Result<f32, Self::Error> {
+    fn price_at(&self, symbol: &str, time: DateTime<Utc>) -> Result<f32, Self::Error> {
         // TODO Remember the random value for a stock and deviate from it using
         // geometric Brownian motion (or some estimation of it). Assume the
         // price is in the middle of the bid/ask spread
@@ -167,7 +165,8 @@ impl<F: Fetcher + Send + Sync + std::fmt::Debug + 'static> Market for Backtestin
         }
 
         // Return the last close price
-        let query_price = match self.query_engine.query_price(&time, &symbol).await {
+        let local_symbol = symbol.to_string(); // TODO this is ugly
+        let query_price = match self.query_engine.query_price(&time, &local_symbol) {
             Ok(it) => it,
             Err(err) => return Err(FetcherError(err).into()),
         };
@@ -175,7 +174,7 @@ impl<F: Fetcher + Send + Sync + std::fmt::Debug + 'static> Market for Backtestin
         Ok(query_price.ok_or(Error::UnknownPrice(symbol.to_string()))?)
     }
 
-    async fn buy_at_market(&mut self, symbol: &str, quantity: u32) -> Result<(), Self::Error> {
+    fn buy_at_market(&mut self, symbol: &str, quantity: u32) -> Result<(), Self::Error> {
         // Ensure the market is open
         if !self.market_time.is_open() {
             return Err(Error::UntimelyTrade(symbol.to_string(), self.time));
@@ -187,7 +186,7 @@ impl<F: Fetcher + Send + Sync + std::fmt::Debug + 'static> Market for Backtestin
 
         // Calculate the transaction's cost
         // TODO include fees, bid and ask too
-        let price_per_share = self.current_price(symbol).await?;
+        let price_per_share = self.current_price(symbol)?;
         let total_price = price_per_share * quantity as f32;
 
         // Ensure the cash is sufficient for it
@@ -216,7 +215,7 @@ impl<F: Fetcher + Send + Sync + std::fmt::Debug + 'static> Market for Backtestin
         Ok(())
     }
 
-    async fn sell_at_market(&mut self, symbol: &str, quantity: u32) -> Result<(), Self::Error> {
+    fn sell_at_market(&mut self, symbol: &str, quantity: u32) -> Result<(), Self::Error> {
         // Ensure the market is open
         if !self.market_time.is_open() {
             return Err(Error::UntimelyTrade(symbol.to_string(), self.time));
@@ -228,7 +227,7 @@ impl<F: Fetcher + Send + Sync + std::fmt::Debug + 'static> Market for Backtestin
 
         // Calculate the transaction's cost
         // TODO include fees, bid and ask too
-        let price_per_share = self.current_price(symbol).await?;
+        let price_per_share = self.current_price(symbol)?;
         let total_price = price_per_share * quantity as f32;
 
         // Ensure there are enough shares of this stock

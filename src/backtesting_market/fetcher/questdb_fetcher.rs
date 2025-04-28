@@ -1,16 +1,14 @@
 use chrono::NaiveDateTime;
 use mmatamm_interface::market::SystemEvent;
-use tokio::try_join;
-use tokio_postgres::Statement;
+use postgres::Statement;
 
 use crate::backtesting_market::query_engine::Ohlc;
 
 use super::Fetcher;
 
-#[derive(Debug)]
 pub struct QuestDbFetcher {
     /// A database client
-    db_client: tokio_postgres::Client,
+    db_client: postgres::Client,
 
     /// A prepared statement for querying all the trade prices of an equity
     prices_query_statement: Statement,
@@ -19,12 +17,11 @@ pub struct QuestDbFetcher {
 }
 
 impl QuestDbFetcher {
-    pub async fn new(db_client: tokio_postgres::Client) -> Result<Self, Error> {
-        let (prices_query_statement, system_events_query_statement) = try_join!(
-            // TODO no need to query the symbol duh
-            db_client.prepare("SELECT * FROM prices WHERE symbol = $1::TEXT;",),
-            db_client.prepare("SELECT * FROM system_events;"),
-        )?;
+    pub fn new(mut db_client: postgres::Client) -> Result<Self, Error> {
+        // TODO PERF Make this run at the same time
+        let prices_query_statement =
+            db_client.prepare("SELECT * FROM prices WHERE symbol = $1::TEXT;")?;
+        let system_events_query_statement = db_client.prepare("SELECT * FROM system_events;")?;
 
         Ok(Self {
             db_client,
@@ -90,11 +87,10 @@ impl Fetcher for QuestDbFetcher {
     // }
 
     // TODO I want to be able to query only a range
-    async fn fetch_system_events(&self) -> Result<Vec<(i64, SystemEvent)>, Self::Error> {
+    fn fetch_system_events(&mut self) -> Result<Vec<(i64, SystemEvent)>, Self::Error> {
         let rows = self
             .db_client
-            .query(&self.system_events_query_statement, &[])
-            .await?;
+            .query(&self.system_events_query_statement, &[])?;
 
         rows.iter()
             .map(|row| {
@@ -119,14 +115,13 @@ impl Fetcher for QuestDbFetcher {
             .collect()
     }
 
-    async fn fetch_ticker_prices(
-        &self,
+    fn fetch_ticker_prices(
+        &mut self,
         symbol: &str,
     ) -> Result<Vec<(i64, crate::backtesting_market::query_engine::Ohlc)>, Self::Error> {
         let rows = self
             .db_client
-            .query(&self.prices_query_statement, &[&symbol])
-            .await?;
+            .query(&self.prices_query_statement, &[&symbol])?;
 
         rows.iter()
             .map(|row| {
@@ -167,7 +162,7 @@ impl Fetcher for QuestDbFetcher {
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("PostgreSQL error")]
-    DatabaseError(#[from] tokio_postgres::Error),
+    DatabaseError(#[from] postgres::Error),
 
     #[error(
         "Symbol '{symbol}' found in database, which is not of the expected kind, {expected_kind}"
@@ -179,6 +174,11 @@ pub enum Error {
 }
 
 impl std::fmt::Display for QuestDbFetcher {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+impl std::fmt::Debug for QuestDbFetcher {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
