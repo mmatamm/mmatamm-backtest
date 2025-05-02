@@ -8,6 +8,7 @@ use timestep_series::TimestepSeries;
 
 use mmatamm_interface::market::SystemEvent;
 
+use crate::ticker_hash::{TickerHasher, TickerHasherBuilder};
 use super::Fetcher;
 
 #[derive(Clone, Debug)]
@@ -25,8 +26,8 @@ pub struct Ohlc {
 pub struct QueryEngine<F: Fetcher> {
     fetcher: Arc<Mutex<F>>,
 
-    prices_series: papaya::HashMap<String, TimestepSeries<Ohlc>, ahash::RandomState>,
     system_events_series: Mutex<TimestepSeries<SystemEvent>>,
+    prices_series: papaya::HashMap<String, TimestepSeries<Ohlc>, TickerHasherBuilder>,
 }
 
 impl<F: Fetcher> QueryEngine<F> {
@@ -36,8 +37,8 @@ impl<F: Fetcher> QueryEngine<F> {
 
         Ok(Self {
             fetcher: fetcher_mutex,
-            prices_series: papaya::HashMap::with_hasher(ahash::RandomState::new()),
             system_events_series: Mutex::new(system_events_series),
+            prices_series: papaya::HashMap::with_hasher(TickerHasherBuilder::default()),
         })
     }
 
@@ -58,22 +59,6 @@ impl<F: Fetcher> QueryEngine<F> {
             .query_before(&time.naive_utc())
             .map(|(_time, ohlc)| ohlc.close))
     }
-    // pub fn query_price(
-    //     &self,
-    //     time: &chrono::DateTime<chrono::Utc>,
-    //     symbol: &str,
-    // ) -> Result<Option<f32>, F::Error> {
-    //     if !self.prices_series.contains_key(symbol) {
-    //         let s = TimestepSeries::new(self.fetcher.lock().unwrap().fetch_ticker_prices(symbol)?);
-    //         self.prices_series.insert(symbol.to_string(), s);
-    //     }
-
-    //     let series = self.prices_series.get(symbol).unwrap();
-
-    //     Ok(series
-    //         .query_before(&time.naive_utc())
-    //         .map(|(_time, ohlc)| ohlc.close))
-    // }
 
     pub fn query_system_event(
         &self,
