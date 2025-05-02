@@ -9,6 +9,7 @@ use timestep_series::TimestepSeries;
 use mmatamm_interface::market::SystemEvent;
 
 use crate::ticker_hash::{TickerHasher, TickerHasherBuilder};
+
 use super::Fetcher;
 
 #[derive(Clone, Debug)]
@@ -26,8 +27,8 @@ pub struct Ohlc {
 pub struct QueryEngine<F: Fetcher> {
     fetcher: Arc<Mutex<F>>,
 
-    system_events_series: Mutex<TimestepSeries<SystemEvent>>,
     prices_series: papaya::HashMap<String, TimestepSeries<Ohlc>, TickerHasherBuilder>,
+    system_events_series: TimestepSeries<SystemEvent>,
 }
 
 impl<F: Fetcher> QueryEngine<F> {
@@ -37,8 +38,8 @@ impl<F: Fetcher> QueryEngine<F> {
 
         Ok(Self {
             fetcher: fetcher_mutex,
-            system_events_series: Mutex::new(system_events_series),
             prices_series: papaya::HashMap::with_hasher(TickerHasherBuilder::default()),
+            system_events_series,
         })
     }
 
@@ -65,8 +66,7 @@ impl<F: Fetcher> QueryEngine<F> {
         time: &chrono::DateTime<chrono::Utc>,
     ) -> Option<(SystemEvent, chrono::NaiveDateTime)> {
         // TODO use NaiveDateTime
-        let system_events_series = self.system_events_series.lock().unwrap();
-        let event_opt = system_events_series.query_after(&time.naive_utc());
+        let event_opt = self.system_events_series.query_after(&time.naive_utc());
         event_opt.map(|(timestamp, event)| {
             (
                 event.clone(),
