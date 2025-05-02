@@ -170,7 +170,7 @@ impl<F: Fetcher + std::fmt::Debug + Send + 'static> Market for BacktestingMarket
             Err(err) => return Err(FetcherError(err).into()),
         };
 
-        Ok(query_price.ok_or(Error::UnknownPrice(symbol.to_string()))?)
+        Ok(query_price.ok_or_else(|| Error::UnknownPrice(symbol.to_string()))?)
     }
 
     fn buy_at_market(&mut self, symbol: &str, quantity: u32) -> Result<(), Self::Error> {
