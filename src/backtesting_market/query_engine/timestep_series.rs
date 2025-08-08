@@ -88,6 +88,7 @@ impl<T> TimestepSeries<T> {
     }
 
     /// Helper function to query within a known date range.
+    #[inline]
     fn query_in_range(
         &self,
         timestamp: i64,
@@ -133,6 +134,7 @@ impl<T> TimestepSeries<T> {
     }
 
     /// Helper function to handle cases where the specified date does not exist.
+    #[inline]
     fn query_nearest_day(&self, date: u16, direction: QueryDirection) -> Option<&(i64, T)> {
         if let Some((_, next_day_index)) = self.days_map.lower_bound(Bound::Excluded(&date)).next()
         {
@@ -180,6 +182,7 @@ pub enum QueryDirection {
 
 const SECONDS_IN_DAY: i32 = 60 * 60 * 24;
 
+#[inline]
 fn timestamp_to_date(timestamp: i64) -> u16 {
     (timestamp / SECONDS_IN_DAY as i64) as u16
 }
