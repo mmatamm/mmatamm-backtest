@@ -1,5 +1,4 @@
 #![feature(sync_unsafe_cell)]
-#![feature(let_chains)]
 #![feature(btree_cursors)]
 
 pub mod backtesting_market;
