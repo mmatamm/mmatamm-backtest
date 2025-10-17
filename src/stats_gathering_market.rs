@@ -24,7 +24,11 @@ pub struct StatsGatheringMarket<M: Market + Send> {
     excess_returns_aggregator: StdDevAggregator,
 }
 
-impl<M: Market + Send> StatsGatheringMarket<M> {
+impl<M> StatsGatheringMarket<M>
+where
+    M: Market + Send,
+    M::Error: std::fmt::Debug,
+{
     pub fn new(market: M, sample_rate: TimeDelta, benchmark: String) -> Self {
         let next_sample = market.time().duration_trunc(sample_rate).unwrap() + sample_rate;
 
@@ -115,7 +119,11 @@ impl<M: Market + Send> StatsGatheringMarket<M> {
     }
 }
 
-impl<M: Market + Send> Market for StatsGatheringMarket<M> {
+impl<M> Market for StatsGatheringMarket<M>
+where
+    M: Market + Send,
+    M::Error: std::fmt::Debug,
+{
     type Error = M::Error;
 
     fn next_event(&mut self) -> Result<Option<(DateTime<Utc>, Event)>, Self::Error> {
@@ -214,7 +222,7 @@ impl<M: Market + Send> Market for StatsGatheringMarket<M> {
         self.market.shares_of(symbol)
     }
 
-    fn holdings(&self) -> impl IntoIterator<Item = (&String, &u32)> {
+    fn holdings(&self) -> Vec<(&String, &u32)> {
         self.market.holdings()
     }
 }

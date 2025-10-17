@@ -96,7 +96,10 @@ impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
     }
 }
 
-impl<F: Fetcher + std::fmt::Debug + Send + 'static> Market for BacktestingMarket<'_, F> {
+impl<F> Market for BacktestingMarket<'_, F>
+where
+    F: Fetcher + std::fmt::Debug + Send + 'static,
+{
     type Error = Error<F>;
 
     fn next_event(&mut self) -> Result<Option<(DateTime<Utc>, Event)>, Self::Error> {
@@ -279,8 +282,8 @@ impl<F: Fetcher + std::fmt::Debug + Send + 'static> Market for BacktestingMarket
         }
     }
 
-    fn holdings(&self) -> impl IntoIterator<Item = (&String, &u32)> {
-        &self.holdings
+    fn holdings(&self) -> Vec<(&std::string::String, &u32)> {
+        self.holdings.iter().collect()
     }
 }
 

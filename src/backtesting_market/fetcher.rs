@@ -13,7 +13,7 @@ use mmatamm_interface::market::SystemEvent;
 // TODO The `: Display` shouldn't be here
 
 pub trait Fetcher: Display {
-    type Error: StdError + Send;
+    type Error: StdError + Send + Sync;
 
     fn fetch_system_events(&mut self) -> Result<Vec<(i64, SystemEvent)>, Self::Error>;
     fn fetch_ticker_prices(&mut self, symbol: &str) -> Result<Vec<(i64, Ohlc)>, Self::Error>;
