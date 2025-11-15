@@ -41,18 +41,22 @@ impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
         start: DateTime<Utc>,
         cash: f32,
     ) -> Result<Self, Error<F>> {
-        Ok(BacktestingMarket {
-            query_engine,
+        if cash < 0.0 {
+            Err(Error::NegativeCash(cash))
+        } else {
+            Ok(BacktestingMarket {
+                query_engine,
 
-            time: start,
-            market_time: MarketTime::Unknown,
-            events: LinkedList::new(),
+                time: start,
+                market_time: MarketTime::Unknown,
+                events: LinkedList::new(),
 
-            next_system_event: None,
+                next_system_event: None,
 
-            cash,
-            holdings: HashMap::new(),
-        })
+                cash,
+                holdings: HashMap::new(),
+            })
+        }
     }
 
     fn peek_next_system_event(&mut self) -> Result<Option<(DateTime<Utc>, SystemEvent)>, Error<F>> {
@@ -342,4 +346,7 @@ pub enum Error<F: Fetcher> {
         future_time: DateTime<Utc>,
         current_time: DateTime<Utc>,
     },
+
+    #[error("Negative amount of cash: {0}")]
+    NegativeCash(f32),
 }
