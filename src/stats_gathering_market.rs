@@ -164,7 +164,7 @@ where
             match event {
                 Event::Deadline => {
                     self.next_sample += self.sample_rate;
-                    self.take_sample();
+                    self.take_sample()?;
                     // Continue the loop to fetch the next event
                 }
                 e => return Ok(Some((time, e))),
