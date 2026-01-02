@@ -66,6 +66,21 @@ where
             .map(|current| Some(current / self.initial_net_worth? - 1.0))
     }
 
+    pub fn extrapolated_net_return(&self) -> Result<Option<f32>, M::Error> {
+        if let Some(net_return) = self.net_return()?
+            && let Some(duration) = self.duration()
+        {
+            Ok(Some(
+                f32::powf(
+                    net_return + 1.0,
+                    TimeDelta::days(365).as_seconds_f32() / duration.as_seconds_f32(),
+                ) - 1.0,
+            ))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn sharpe_ratio(&self) -> Option<f32> {
         if let Some(stddev) = self.excess_returns_aggregator.calc_stddev(true) {
             let mean = self
@@ -93,6 +108,13 @@ where
 
         if let Some(net_return) = self.net_return()? {
             builder.push_record(["Net Return", &format!("{0:.2}%", net_return * 100.0)]);
+        }
+
+        if let Some(extrapolated_net_return) = self.extrapolated_net_return()? {
+            builder.push_record([
+                "Extrapolated Net Return (Per Year)",
+                &format!("{0:.2}%", extrapolated_net_return * 100.0),
+            ]);
         }
 
         if let Some(sharpe_ratio) = self.sharpe_ratio() {
