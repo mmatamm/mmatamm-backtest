@@ -3,12 +3,12 @@ use std::{error::Error, sync::Arc};
 use chrono::{DateTime, TimeDelta, Utc};
 use mmatamm_backtest::{
     backtesting_market::{
-        fetcher::{HDF5Fetcher, QuestDbFetcher},
         BacktestingMarket, QueryEngine,
+        fetcher::{HDF5Fetcher, QuestDbFetcher},
     },
     stats_gathering_market::StatsGatheringMarket,
 };
-use mmatamm_interface::{external_algorithm::ExternalAlgorithm, AnyhowMarket};
+use mmatamm_interface::{AnyhowMarket, external_algorithm::ExternalAlgorithm};
 use postgres::NoTls;
 
 fn main() -> Result<(), Box<dyn Error>> {

@@ -8,7 +8,7 @@ use timestep_series::TimestepSeries;
 
 use mmatamm_interface::market::SystemEvent;
 
-use crate::ticker_hash::{TickerHasher, TickerHasherBuilder};
+use crate::ticker_hash::TickerHasherBuilder;
 
 use super::Fetcher;
 

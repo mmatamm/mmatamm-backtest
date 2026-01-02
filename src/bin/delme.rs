@@ -9,8 +9,8 @@ use mmatamm_backtest::{
     stats_gathering_market::StatsGatheringMarket,
 };
 use mmatamm_interface::{
-    market::{Event, Market, MarketTime, SystemEvent},
     Algorithm,
+    market::{Event, Market, MarketTime, SystemEvent},
 };
 use postgres::NoTls;
 
