@@ -1,7 +1,7 @@
 pub struct StdDevAggregator {
     count: f32,
     mean: f32,
-    m2: f32,
+    m2: f32, // NOTE This is unrelated to the M2 measurement
 }
 
 impl StdDevAggregator {
