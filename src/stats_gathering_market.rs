@@ -127,9 +127,9 @@ where
         Ok(table.to_string())
     }
 
-    fn take_sample(&mut self) {
-        let net_worth = self.net_worth().unwrap() as f32;
-        let benchmark = self.current_price(&self.benchmark).unwrap() as f32;
+    fn take_sample(&mut self) -> Result<(), M::Error> {
+        let net_worth = self.net_worth()? as f32;
+        let benchmark = self.current_price(&self.benchmark)? as f32;
 
         if let Some(previous_net_worth) = self.initial_net_worth {
             let previous_benchmark = self
@@ -142,6 +142,8 @@ where
             self.initial_net_worth = Some(net_worth);
             self.initial_benchmark = Some(benchmark);
         }
+
+        Ok(())
     }
 }
 
@@ -205,7 +207,7 @@ where
             match event {
                 Event::Deadline if self.next_sample <= deadline => {
                     self.next_sample += self.sample_rate;
-                    self.take_sample();
+                    self.take_sample()?;
                     // Continue the loop to fetch the next event
                 }
                 _ => return Ok((time, event)),
