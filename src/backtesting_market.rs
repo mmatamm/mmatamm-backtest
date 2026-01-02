@@ -4,6 +4,7 @@ mod query_engine;
 use std::collections::{HashMap, LinkedList};
 use std::error::Error as StdError;
 use std::fmt::Display;
+use std::sync::Arc;
 
 use fetcher::Fetcher;
 use mmatamm_interface::MsTime;
@@ -12,9 +13,9 @@ use thiserror::Error;
 
 use mmatamm_interface::market::{Event, ImpossibleEvent, Market, MarketTime, SystemEvent};
 
-pub struct BacktestingMarket<'a, F: Fetcher> {
+pub struct BacktestingMarket<F: Fetcher> {
     // /// A database client TODO better comment needed
-    query_engine: &'a QueryEngine<F>,
+    query_engine: Arc<QueryEngine<F>>,
 
     /// The current virtual time
     time: MsTime,
@@ -35,9 +36,9 @@ pub struct BacktestingMarket<'a, F: Fetcher> {
     holdings: HashMap<String, u32>,
 }
 
-impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
+impl<F: Fetcher> BacktestingMarket<F> {
     pub fn new(
-        query_engine: &'a QueryEngine<F>,
+        query_engine: Arc<QueryEngine<F>>,
         start: MsTime,
         cash: f32,
     ) -> Result<Self, Error<F>> {
@@ -99,7 +100,7 @@ impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
     }
 }
 
-impl<F> Market for BacktestingMarket<'_, F>
+impl<F> Market for BacktestingMarket<F>
 where
     F: Fetcher + std::fmt::Debug + Send + 'static,
 {

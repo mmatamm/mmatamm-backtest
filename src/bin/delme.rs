@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, error::Error};
+use std::{collections::VecDeque, error::Error, sync::Arc};
 
 use chrono::{DateTime, TimeDelta, Utc};
 use mmatamm_backtest::{
@@ -140,7 +140,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     let fetcher = QuestDbFetcher::new(db_client)?;
-    let query_engine = QueryEngine::new(fetcher)?;
+    let query_engine = Arc::new(QueryEngine::new(fetcher)?);
 
     let mut market = StatsGatheringMarket::new(
         BacktestingMarket::new(
