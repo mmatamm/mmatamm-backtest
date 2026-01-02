@@ -28,8 +28,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let query_engine = QueryEngine::new(fetcher)?;
 
     let backtesting_market = BacktestingMarket::new(
-        &query_engine,
-        "2024-06-25T13:00:00Z".parse::<DateTime<Utc>>()?,
+        query_engine,
+        "2024-06-25T13:00:00Z".parse::<DateTime<Utc>>()?.into(),
         10_000.0,
     )?;
     let mut stats_market = StatsGatheringMarket::new(

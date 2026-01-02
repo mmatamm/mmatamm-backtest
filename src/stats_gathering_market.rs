@@ -1,9 +1,12 @@
 // TODO Make `display` and tabled dependency optional
 
-use chrono::{DateTime, DurationRound, TimeDelta, Utc};
+use chrono::TimeDelta;
 use tabled::{builder::Builder, settings::Style};
 
-use mmatamm_interface::market::{Event, Market, MarketTime};
+use mmatamm_interface::{
+    MsTime,
+    market::{Event, Market, MarketTime},
+};
 
 use crate::statistics::StdDevAggregator;
 
@@ -11,12 +14,12 @@ use crate::statistics::StdDevAggregator;
 pub struct StatsGatheringMarket<M: Market + Send> {
     market: M,
 
-    sample_rate: TimeDelta,
+    sample_rate: i64,
     benchmark: String,
 
-    next_sample: DateTime<Utc>,
+    next_sample: MsTime,
 
-    first_trade: Option<DateTime<Utc>>,
+    first_trade: Option<MsTime>,
     initial_net_worth: Option<f32>,
     initial_benchmark: Option<f32>,
 
@@ -30,12 +33,13 @@ where
     M::Error: std::fmt::Debug,
 {
     pub fn new(market: M, sample_rate: TimeDelta, benchmark: String) -> Self {
-        let next_sample = market.time().duration_trunc(sample_rate).unwrap() + sample_rate;
+        let sample_rate_ms = sample_rate.num_milliseconds();
+        let next_sample = market.time() + sample_rate_ms;
 
         StatsGatheringMarket {
             market,
 
-            sample_rate,
+            sample_rate: sample_rate_ms,
             benchmark,
 
             next_sample,
@@ -48,12 +52,12 @@ where
         }
     }
 
-    pub fn first_trade(&self) -> Option<DateTime<Utc>> {
+    pub fn first_trade(&self) -> Option<MsTime> {
         self.first_trade
     }
 
     pub fn duration(&self) -> Option<TimeDelta> {
-        Some(self.market.time() - self.first_trade?)
+        TimeDelta::try_milliseconds(self.market.time() - self.first_trade?)
     }
 
     pub fn net_return(&self) -> Result<Option<f32>, M::Error> {
@@ -126,7 +130,7 @@ where
 {
     type Error = M::Error;
 
-    fn next_event(&mut self) -> Result<Option<(DateTime<Utc>, Event)>, Self::Error> {
+    fn next_event(&mut self) -> Result<Option<(MsTime, Event)>, Self::Error> {
         loop {
             let (time, event) = self.market.next_event_until(self.next_sample)?;
 
@@ -171,10 +175,7 @@ where
     //         }
     //     }
     // }
-    fn next_event_until(
-        &mut self,
-        deadline: chrono::DateTime<Utc>,
-    ) -> Result<(DateTime<Utc>, Event), Self::Error> {
+    fn next_event_until(&mut self, deadline: MsTime) -> Result<(MsTime, Event), Self::Error> {
         loop {
             let until = self.next_sample.min(deadline);
             let (time, event) = self.market.next_event_until(until)?;
@@ -190,11 +191,11 @@ where
         }
     }
 
-    fn time(&self) -> DateTime<Utc> {
+    fn time(&self) -> MsTime {
         self.market.time()
     }
 
-    fn price_at(&self, symbol: &str, time: DateTime<Utc>) -> Result<f32, Self::Error> {
+    fn price_at(&self, symbol: &str, time: MsTime) -> Result<f32, Self::Error> {
         self.market.price_at(symbol, time)
     }
 

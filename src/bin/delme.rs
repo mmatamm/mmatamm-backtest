@@ -1,8 +1,11 @@
 use std::{collections::VecDeque, error::Error};
 
-use chrono::{DateTime, DurationRound, TimeDelta, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use mmatamm_backtest::{
-    backtesting_market::{fetcher::QuestDbFetcher, BacktestingMarket, QueryEngine},
+    backtesting_market::{
+        BacktestingMarket, QueryEngine,
+        fetcher::{HDF5Fetcher, QuestDbFetcher},
+    },
     stats_gathering_market::StatsGatheringMarket,
 };
 use mmatamm_interface::{
@@ -13,7 +16,7 @@ use postgres::NoTls;
 
 struct CrossMovingAverageStrategy {
     symbol: String,
-    timestep_duration: TimeDelta,
+    timestep_duration: i64,
     short_ma_duration: usize,
     long_ma_duration: usize,
 
@@ -35,7 +38,7 @@ impl CrossMovingAverageStrategy {
 
         CrossMovingAverageStrategy {
             symbol: symbol.to_string(),
-            timestep_duration,
+            timestep_duration: timestep_duration.num_milliseconds(),
             short_ma_duration,
             long_ma_duration,
 
@@ -63,11 +66,7 @@ impl Algorithm for CrossMovingAverageStrategy {
         }
         // assert_eq!(Event::SystemEvent(SystemEvent::RegularMarketStart));
 
-        let mut next_tick = market
-            .time()
-            .duration_trunc(self.timestep_duration)
-            .unwrap()
-            + self.timestep_duration;
+        let mut next_tick = market.time() + self.timestep_duration;
 
         for _ in 0..3000 {
             let (_, event) = market.next_event_until(next_tick)?;
@@ -145,8 +144,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut market = StatsGatheringMarket::new(
         BacktestingMarket::new(
-            &query_engine,
-            "2024-06-25T13:00:00Z".parse::<DateTime<Utc>>()?,
+            query_engine,
+            "2024-06-25T13:00:00Z".parse::<DateTime<Utc>>()?.into(),
             10_000.0,
         )?,
         TimeDelta::minutes(15),

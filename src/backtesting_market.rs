@@ -5,8 +5,8 @@ use std::collections::{HashMap, LinkedList};
 use std::error::Error as StdError;
 use std::fmt::Display;
 
-use chrono::{DateTime, Utc};
 use fetcher::Fetcher;
+use mmatamm_interface::MsTime;
 pub use query_engine::QueryEngine;
 use thiserror::Error;
 
@@ -17,14 +17,14 @@ pub struct BacktestingMarket<'a, F: Fetcher> {
     query_engine: &'a QueryEngine<F>,
 
     /// The current virtual time
-    time: DateTime<Utc>,
+    time: MsTime,
     /// The current market time (e.g. pre-market, regular hours, etc...)
     market_time: MarketTime,
     /// All the following events. This does not include system events and
     /// deadlines.
-    events: LinkedList<(DateTime<Utc>, Event)>,
+    events: LinkedList<(MsTime, Event)>,
 
-    next_system_event: Option<(DateTime<Utc>, SystemEvent)>,
+    next_system_event: Option<(MsTime, SystemEvent)>,
 
     // TODO seperate `cash` to `available_cash` and `locked_cash` (or some other name). =
     // available_cash will be subtracted from when submitting an order, and added to
@@ -38,7 +38,7 @@ pub struct BacktestingMarket<'a, F: Fetcher> {
 impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
     pub fn new(
         query_engine: &'a QueryEngine<F>,
-        start: DateTime<Utc>,
+        start: MsTime,
         cash: f32,
     ) -> Result<Self, Error<F>> {
         if cash < 0.0 {
@@ -47,7 +47,7 @@ impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
             Ok(BacktestingMarket {
                 query_engine,
 
-                time: start,
+                time: start.into(),
                 market_time: MarketTime::Unknown,
                 events: LinkedList::new(),
 
@@ -59,8 +59,7 @@ impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
         }
     }
 
-    fn peek_next_system_event(&mut self) -> Result<Option<(DateTime<Utc>, SystemEvent)>, Error<F>> {
-        // println!("I'm here!");
+    fn peek_next_system_event(&mut self) -> Result<Option<(MsTime, SystemEvent)>, Error<F>> {
         // If the next event is cached and it still is the next event, return it
         if let Some((next_system_event_time, _)) = self.next_system_event {
             if self.time < next_system_event_time {
@@ -69,17 +68,17 @@ impl<'a, F: Fetcher> BacktestingMarket<'a, F> {
         }
 
         // Else, fetch the next event
-        let event = self.query_engine.query_system_event(&self.time);
+        let event = self.query_engine.query_system_event(&self.time.into());
 
         // Cache it
         self.next_system_event =
-            event.map(|(event_type, timestamp)| (timestamp.and_utc(), event_type));
+            event.map(|(event_type, time)| (time.and_utc().into(), event_type));
 
         // And return it
         Ok(self.next_system_event.clone())
     }
 
-    fn peek_next_event(&mut self) -> Result<Option<(DateTime<Utc>, Event)>, Error<F>> {
+    fn peek_next_event(&mut self) -> Result<Option<(MsTime, Event)>, Error<F>> {
         let next_system_event = self.peek_next_system_event()?;
         let next_internal_event = self.events.front();
 
@@ -106,7 +105,7 @@ where
 {
     type Error = Error<F>;
 
-    fn next_event(&mut self) -> Result<Option<(DateTime<Utc>, Event)>, Self::Error> {
+    fn next_event(&mut self) -> Result<Option<(MsTime, Event)>, Self::Error> {
         match self.peek_next_event()? {
             Some((time, event)) => {
                 self.time = time;
@@ -123,10 +122,7 @@ where
         }
     }
 
-    fn next_event_until(
-        &mut self,
-        deadline: DateTime<Utc>,
-    ) -> Result<(DateTime<Utc>, Event), Self::Error> {
+    fn next_event_until(&mut self, deadline: MsTime) -> Result<(MsTime, Event), Self::Error> {
         // // NOTE This duration_trunc takes about 13% of the time of this entire
         // function let next_tick = self.time.duration_trunc(tick).unwrap() +
         // tick;
@@ -151,11 +147,11 @@ where
         Ok(event)
     }
 
-    fn time(&self) -> DateTime<Utc> {
+    fn time(&self) -> MsTime {
         self.time
     }
 
-    fn price_at(&self, symbol: &str, time: DateTime<Utc>) -> Result<f32, Self::Error> {
+    fn price_at(&self, symbol: &str, time: MsTime) -> Result<f32, Self::Error> {
         // TODO Remember the random value for a stock and deviate from it using
         // geometric Brownian motion (or some estimation of it). Assume the
         // price is in the middle of the bid/ask spread
@@ -172,7 +168,7 @@ where
         }
 
         // Return the last close price
-        let query_price = match self.query_engine.query_price(&time, symbol) {
+        let query_price = match self.query_engine.query_price(&time.into(), symbol) {
             Ok(it) => it,
             Err(err) => return Err(FetcherError(err).into()),
         };
@@ -310,7 +306,7 @@ pub enum Error<F: Fetcher> {
     DatabaseError(#[from] FetcherError<F>),
 
     #[error("Attempted to trade {0} at {1}, outside of trading hours")]
-    UntimelyTrade(String, DateTime<Utc>),
+    UntimelyTrade(String, MsTime),
 
     #[error("Attempted to trade {0} yet the price is unknown")]
     UnknownPrice(String),
@@ -343,8 +339,8 @@ pub enum Error<F: Fetcher> {
 
     #[error("Tried to query data from {future_time} at {current_time}")]
     FutureQuery {
-        future_time: DateTime<Utc>,
-        current_time: DateTime<Utc>,
+        future_time: MsTime,
+        current_time: MsTime,
     },
 
     #[error("Negative amount of cash: {0}")]
