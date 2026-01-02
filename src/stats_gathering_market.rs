@@ -131,13 +131,16 @@ where
         let net_worth = self.net_worth()? as f32;
         let benchmark = self.current_price(&self.benchmark)? as f32;
 
-        if let Some(previous_net_worth) = self.initial_net_worth {
-            let previous_benchmark = self
+        if let Some(initial_net_worth) = self.initial_net_worth {
+            let initial_benchmark = self
                 .initial_benchmark
-                .expect("previous_net_worth is set but previous_benchmark is not");
+                .expect("initial_net_worth is set but initial_benchmark is not");
 
-            let excess = net_worth / previous_net_worth - benchmark / previous_benchmark;
-            self.excess_returns_aggregator.update(excess);
+            let portfolio_returns = (net_worth - initial_net_worth) / initial_net_worth;
+            let benchmark_returns = (benchmark - initial_benchmark) / initial_benchmark;
+            let excess_returns = portfolio_returns - benchmark_returns;
+
+            self.excess_returns_aggregator.update(excess_returns);
         } else {
             self.initial_net_worth = Some(net_worth);
             self.initial_benchmark = Some(benchmark);
